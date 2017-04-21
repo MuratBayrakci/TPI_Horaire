@@ -1,14 +1,24 @@
 package ch.cpln.bayrakcimu.tpi_horaire;
 
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.RectShape;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -22,11 +32,17 @@ import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -39,6 +55,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
@@ -51,7 +68,14 @@ public class MainActivity extends AppCompatActivity {
     String ContenuClasse ="";
     String ContenuDate="";
 
+
+    int iCouleurTableau = 0;
+    Boolean LargeurChampsHeure = true;
     Boolean DateDuJour = true;
+
+
+    ArrayList<String> AlistHistorique = new ArrayList<String>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,6 +86,11 @@ public class MainActivity extends AppCompatActivity {
         ContenuEditText();
         BoutonListeners();
         Requete();
+        EcritureFichier();
+        LectureFichier();
+        SetAutoCompleteTextView();
+
+
 
 
 
@@ -74,6 +103,9 @@ public class MainActivity extends AppCompatActivity {
                 ContenuEditText();
                 BoutonListeners();
                 Requete();
+                EcritureFichier();
+                LectureFichier();
+                SetAutoCompleteTextView();
 
 
             }
@@ -127,6 +159,64 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void SetAutoCompleteTextView(){
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_dropdown_item_1line, AlistHistorique);
+        AutoCompleteTextView textView = (AutoCompleteTextView)
+                findViewById(R.id.ActvClasse);
+        textView.setThreshold(0);
+        textView.setAdapter(adapter);
+    }
+
+    public void EcritureFichier(){
+        AutoCompleteTextView Actv = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
+        String string = Actv.getText().toString();
+
+        File chemin = getBaseContext().getFilesDir();
+        File fichier = new File(chemin, "storage.txt");
+        Writer writer;
+        try {
+            writer = new BufferedWriter(new FileWriter(fichier, true));
+            writer.append(string + "\n");
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+    public void LectureFichier(){
+
+        File chemin = getBaseContext().getFilesDir();
+        File fichier = new File(chemin, "storage.txt");
+        String ligne ="";
+
+        try{
+            BufferedReader input = new BufferedReader(new FileReader(fichier));
+            while ((ligne = input.readLine()) != null) {
+                int i= 0;
+                AlistHistorique.add(i, ligne);
+                i++;
+            }
+            input.close();
+        }catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        SuppressionDoublons();
+
+    }
+    public void SuppressionDoublons(){
+
+        HashSet<String> hashSet = new HashSet<String>();
+        hashSet.addAll(AlistHistorique);
+        AlistHistorique.clear();
+        AlistHistorique.addAll(hashSet);
+
+    }
+
+
     public void TraitementDate(String string, int i){
 
         try {
@@ -137,10 +227,37 @@ public class MainActivity extends AppCompatActivity {
             calendar.add(Calendar.DATE, i);
             ContenuDate = Formater.format(calendar.getTime());
 
-            String NomduJour = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+
 
             EditText EtDate = (EditText)findViewById(R.id.EtDate);
             EtDate.setText(ContenuDate);
+
+
+            String NomduJour = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+            switch(NomduJour){
+                case "Monday":
+                    NomduJour = "Lundi";
+                    break;
+                case "Tuesday":
+                    NomduJour = "Mardi";
+                    break;
+                case "Wednesday":
+                    NomduJour = "Mercredi";
+                    break;
+                case "Thursday":
+                    NomduJour = "Jeudi";
+                    break;
+                case "Friday":
+                    NomduJour = "Vendredi";
+                    break;
+                case "Saturday":
+                    NomduJour = "Samedi";
+                    break;
+                case "Sunday":
+                    NomduJour = "Dimanche";
+                    break;
+            }
+
             TextView TvJourDeLaSemaine = (TextView)findViewById(R.id.TvJourDeLaSemaine);
             TvJourDeLaSemaine.setText(NomduJour);
 
@@ -173,12 +290,27 @@ public class MainActivity extends AppCompatActivity {
     }
     public void EffacerRecherches(){
 
+        File path2 = getBaseContext().getFilesDir();
+        File file2 = new File(path2, "storage.txt");
+        try {
+            PrintWriter pw = new PrintWriter(file2);
+            pw.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+
+        AlistHistorique.clear();
+        LectureFichier();
+        SetAutoCompleteTextView();
+
     }
 
     public void ContenuEditText(){
 
-        EditText EtClasse = (EditText)findViewById(R.id.EtClasse);
-         ContenuClasse = EtClasse.getText().toString();
+
+        AutoCompleteTextView Actv =(AutoCompleteTextView)findViewById(R.id.ActvClasse);
+         ContenuClasse = Actv.getText().toString();
 
 
         SimpleDateFormat Formater = new SimpleDateFormat("dd-MM-yyyy");
@@ -211,6 +343,7 @@ DateDuJour = false;
             Id =  ParseId(Output);
             Output2 =  new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=horaire&ident=" + Id + "&sub=date&date=" + ContenuDate).get();
             ParseOutput(Output2);
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
@@ -235,12 +368,8 @@ DateDuJour = false;
         String[] ArrayCalculHeureString = new String[100];
 
 
-    //    ArrayList<Integer> aListDebut = new ArrayList<Integer>();
-   //     ArrayList<Integer> aListFin = new ArrayList<Integer>();
-        ArrayList<Integer> aListCalcul = new ArrayList<Integer>();
 
-     //   ArrayList<String> AlistArrayHeureDebut = new ArrayList<String>();
-    //    ArrayList<String> AlistArrayHeureFin = new ArrayList<String>();
+        ArrayList<Integer> aListCalcul = new ArrayList<Integer>();
         ArrayList<String> AlistHeureDebutComplet = new ArrayList<String>();
         ArrayList<String> AlistHeureFinComplet = new ArrayList<String>();
         ArrayList<String> AlistLibelle = new ArrayList<String>();
@@ -287,6 +416,7 @@ DateDuJour = false;
 
                 }catch(JSONException e) {
                     ArraySalle[i] = "/-";
+
 
 
                 }
@@ -343,7 +473,7 @@ DateDuJour = false;
 
             }
 
-          //  Collections.sort(aListCalcul);
+
 
 
 
@@ -381,153 +511,124 @@ DateDuJour = false;
 
 
 
+        LinearLayout ViewPrincipale = (LinearLayout) findViewById (R.id.LlGeneral);
+        LinearLayout llHoriz = new LinearLayout(getBaseContext());
+        LinearLayout llVert1 = new LinearLayout(getBaseContext());
+        LinearLayout llVert2 = new LinearLayout(getBaseContext());
+        LinearLayout llVert3 = new LinearLayout(getBaseContext());
+        ViewPrincipale.removeAllViews();
+        iCouleurTableau = 0;
 
 
+        for(int i50 = 0; i50<jsonArrayGeneral.length();i50++) {
 
-        TextView TvResultat = (TextView) findViewById(R.id.TvResultat);
-        //    TvResultat.setText(ArrayHeureDebut[0] + " " + ArrayHeureDebut[1] + " " + ArrayHeureDebut[2] + " " + ArrayHeureDebut[3] );
-            // TvResultat.setText(ArrayHeureFin[0] + " " + ArrayHeureFin[1] + " " + ArrayHeureFin[2] + " " + ArrayHeureFin[3]);
-
-       // TvResultat.setText(AlistLibelle.get(0));
-
-
-            TextView TvTest = (TextView) findViewById(R.id.TvTest);
-            //  TvTest.setText(ArrayCalculHeureString[0] + " " + ArrayCalculHeureString[1] + " " + ArrayCalculHeureString[2] + " " + ArrayCalculHeureString[3] + " " + ArrayProfesseur[0] + " "+ ArraySalle[0]);
-
-
-            TextView TvSalle = (TextView) findViewById(R.id.TvSalle);
-            TextView TvHeureDebut = (TextView) findViewById(R.id.TvHeureDebut);
-            TextView TvHeureFin = (TextView) findViewById(R.id.TvHeureFin);
-            TextView TvLibelle = (TextView) findViewById(R.id.TvLibelle);
-            TextView TvProf = (TextView) findViewById(R.id.TvProf);
-
-            TvSalle.setText(ArraySalle[0]);
-            TvHeureDebut.setText(ArrayHeureDebutComplet[0]);
-            TvHeureFin.setText(ArrayHeureFinComplet[0]);
-            TvLibelle.setText(ArrayLibelle[0]);
-            TvProf.setText(ArrayProfesseur[0]);
+            llHoriz = CreationHorizLayout();
+            llVert1 = CreationVerticLayout();
+            llVert2 = CreationVerticLayout();
+            llVert3 = CreationVerticLayout();
+            iCouleurTableau++;
+            TextView tv = CreationTextView(AlistHeureDebutComplet.get(i50));
+            TextView tv2 = CreationTextView(AlistHeureFinComplet.get(i50));
+            LargeurChampsHeure = false;
+            TextView tv3 = CreationTextView(AlistLibelle.get(i50));
+            TextView tv4 = CreationTextView(AlistProfesseur.get(i50));
+            TextView tv5 = CreationTextView(AlistArraySalle.get(i50));
+            TextView tv6 = CreationTextView(" ");
+            LargeurChampsHeure = true;
 
 
+            ViewPrincipale.addView(llHoriz);
+            llHoriz.addView(llVert1);
+            llHoriz.addView(llVert2);
+            llHoriz.addView(llVert3);
 
+            llVert1.addView(tv);
+            llVert1.addView(tv2);
+            llVert2.addView(tv3);
+            llVert2.addView(tv4);
+            llVert3.addView(tv5);
+            llVert3.addView(tv6);
         }
 
 
 
-    public void CreationLayout(){
 
 
-        /*
-        LinearLayout parent = new LinearLayout(this);
-        parent.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        parent.setOrientation(LinearLayout.HORIZONTAL);
-
-        LinearLayout layout = new LinearLayout(this);
-        layout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout2 = new LinearLayout(this);
-        layout2.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout2.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout3 = new LinearLayout(this);
-        layout3.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout3.setOrientation(LinearLayout.VERTICAL);
-
-        parent.addView(layout);
-        parent.addView(layout2);
-        parent.addView(layout3);
-
-
-        TextView tv1 = new TextView(this);
-        TextView tv2 = new TextView(this);
-        TextView tv3 = new TextView(this);
-        TextView tv4 = new TextView(this);
-        TextView tv5 = new TextView(this);
-
-        layout.addView(tv1);
-        layout.addView(tv2);
-        layout2.addView(tv3);
-        layout2.addView(tv4);
-        layout3.addView(tv5);
-
-        tv1.setText("SIFHASIOFHDIOFSDFHIOSD");
-*/
-/*
-        LinearLayout parent = new LinearLayout(this);
-         parent = (LinearLayout)findViewById(R.id.LlGeneral);
-        parent.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        parent.setOrientation(LinearLayout.HORIZONTAL);
-
-        LinearLayout layout = (LinearLayout)findViewById(R.id.Ll1);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout2 = (LinearLayout)findViewById(R.id.Ll2);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout3 = (LinearLayout)findViewById(R.id.Ll3);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-
-        LinearLayout layoutsupreme = (LinearLayout)findViewById(R.id.LlSupreme);
-        layoutsupreme.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        layoutsupreme.setOrientation(LinearLayout.VERTICAL);
-
-
-        TextView TvHeureDebut = (TextView)findViewById(R.id.TvHeureDebut);
-        TextView TvHeureFin = (TextView)findViewById(R.id.TvHeureFin);
-        TextView TvProf = (TextView)findViewById(R.id.TvProf);
-        TextView TvLibelle = (TextView)findViewById(R.id.TvLibelle);
-        TextView TvSalle = (TextView)findViewById(R.id.TvSalle);
-
-
-
-        layoutsupreme.addView(parent);
-        parent.addView(layout);
-        parent.addView(layout2);
-        parent.addView(layout3);
-
-
-
-        layout.addView(TvHeureDebut);
-        layout.addView(TvHeureFin);
-        layout2.addView(TvLibelle);
-        layout2.addView(TvProf);
-        layout3.addView(TvSalle);
-
-        TvHeureDebut.setText("CAR MARCH");
-
-
-*/
-
-/*
-        View LlSupreme = findViewById(R.id.LlSupreme);
-        //View L1General = findViewById(R.id.LlGeneral);
-        LinearLayout a = new LinearLayout(this);
-
-        TextView valueTv = new TextView(this);
-        valueTv.setText("lol");
-        valueTv.setId(0);
-        valueTv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-
-
-        ((LinearLayout) LlSupreme).addView(valueTv);
-
-      //  ((LinearLayout)L1General).removeView(LlSupreme);
-      //  ((LinearLayout)L1General).addView(L1General);
-      //  ((LinearLayout)LlSupreme).addView(a); */
-
-
-        LinearLayout LlSupreme = (LinearLayout) findViewById(R.id.LlSupreme);
-        LinearLayout LlGeneral = (LinearLayout) findViewById(R.id.LlGeneral);
-
-
-      //  ((LinearLayout) LlSupreme).addView(LlGeneral);
 
     }
+
+    public  TextView CreationTextView (String text)
+    {
+
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int HauteurEcran = displayMetrics.heightPixels;
+        int LargeurEcran = displayMetrics.widthPixels;
+
+        TextView tv = new TextView (getBaseContext());
+        tv.setText (text) ;
+        if(LargeurChampsHeure){
+            tv.setWidth(LargeurEcran/5);
+        }
+        else
+        {
+            tv.setWidth(LargeurEcran/2);
+        }
+        tv.setHeight(HauteurEcran/11);
+        // tv.setHeight(200);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
+        tv.setGravity(Gravity.CENTER);
+        tv.setTextColor(Color.BLACK) ;
+        return tv;
+    }
+
+    public  LinearLayout CreationHorizLayout()
+    {
+        LinearLayout ll = new LinearLayout (getBaseContext());
+        ll.setOrientation(LinearLayout.HORIZONTAL);
+
+
+
+
+
+        ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+
+        ShapeDrawable sd = new ShapeDrawable();
+        sd.setShape(new RectShape());
+        sd.getPaint().setStrokeWidth(5);
+        sd.getPaint().setStyle(Paint.Style.STROKE);
+        ll.setBackground(sd);
+
+        return ll;
+    }
+
+    public LinearLayout CreationVerticLayout(){
+
+
+
+
+        LinearLayout ll = new LinearLayout(getBaseContext());
+        ll.setOrientation(LinearLayout.VERTICAL);
+
+        ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        ShapeDrawable sd = new ShapeDrawable();
+
+        if ((iCouleurTableau % 2) == 1){
+            sd.getPaint().setColor(Color.argb(235,235,235,235));
+
+        }
+        else{
+            sd.getPaint().setColor(Color.argb(201,201,201,201));
+
+        }
+
+        ll.setBackground(sd);
+
+        return ll;
+    }
+
 
 
     public String ParseId(String string){
@@ -537,101 +638,7 @@ DateDuJour = false;
         return string;
     }
 
-/*
-    private class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
 
-        HttpURLConnection conn;
-        URL url = null;
-
-
-        @Override
-        protected String doInBackground(String... params){
-
-            try {
-                url = new URL (params[0]);
-
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-                return "exception1";
-            }
-
-            try {
-                conn = (HttpURLConnection)url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoInput(true);
-                conn.setDoOutput(true);
-                conn.connect();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                return "exception2";
-            }
-
-            try {
-                int response_code = conn.getResponseCode();
-
-                if (response_code == HttpURLConnection.HTTP_OK) {
-                    InputStream input = conn.getInputStream();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-                    StringBuilder result = new StringBuilder();
-                    String line;
-
-
-                    while ((line = reader.readLine()) != null) {
-                        result.append(line);
-                    }
-                    return (result.toString());
-
-
-                } else {
-                    return ("unsuccessful");
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return "exception3";
-            }
-            finally {
-                conn.disconnect();
-            }
-
-        }
-
-
-        @Override
-        protected void onPostExecute(String result) {
-
-
-
-            String lol="";
-            ArrayList<String> alist = new ArrayList<String>();
-
-            try {
-
-                JSONArray jsonArrayGeneral = new JSONArray(result);
-                for(int i =0;i<jsonArrayGeneral.length();i++) {
-
-                    JSONObject jsonObjectGeneral = jsonArrayGeneral.getJSONObject(i);
-                   // alist.add(i) = jsonObjectGeneral.getString("libelle");
-                    alist.add(jsonObjectGeneral.getString("libelle"));
-                }
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
-            TextView TvResultat = (TextView)findViewById(R.id.TvResultat);
-            TvResultat.setText(alist.get(0));
-
-
-        }
-
-
-
-
-
-
-    }
-    */
 
 
 }

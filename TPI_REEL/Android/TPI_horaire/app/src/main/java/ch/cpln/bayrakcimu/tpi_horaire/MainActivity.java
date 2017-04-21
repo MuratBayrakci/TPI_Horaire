@@ -1,7 +1,10 @@
 package ch.cpln.bayrakcimu.tpi_horaire;
 
+import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RectShape;
 import android.net.Uri;
@@ -16,11 +19,17 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -29,11 +38,17 @@ import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -46,8 +61,11 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.ErrorManager;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -55,13 +73,20 @@ public class MainActivity extends AppCompatActivity {
     String Output="";
     String Id="";
     String Output2="";
+    String OutputListeClasse="";
     String ContenuClasse ="";
     String ContenuDate="";
+    ArrayList<String> AlistToutesClasses = new ArrayList<String>();
 
-    int iCouleurHeure = 0;
+
     int iCouleurTableau = 0;
-
+    Boolean LargeurChampsHeure = true;
     Boolean DateDuJour = true;
+
+
+
+    ArrayList<String> AlistHistorique = new ArrayList<String>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,9 +94,68 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        ContenuEditText();
-        BoutonListeners();
-        Requete();
+
+        Button btnDatePicker = (Button)findViewById(R.id.btndatepicker);
+        btnDatePicker.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Calendar DateActuelle=Calendar.getInstance();
+                int AnneeActuelle = DateActuelle.get(Calendar.YEAR);
+                int MoisActuel=DateActuelle.get(Calendar.MONTH);
+                int JourActuel=DateActuelle.get(Calendar.DAY_OF_MONTH);
+
+                final DatePickerDialog mDatePicker=new DatePickerDialog(MainActivity.this, new DatePickerDialog.OnDateSetListener() {
+                    public void onDateSet(DatePicker datepicker, int AnneeChoisie, int MoisChoisi, int JourChoisi) {
+
+                        int  jour = JourChoisi;
+                        int mois = MoisChoisi;
+                        int annee = AnneeChoisie;
+
+                       String dateComplet = String.valueOf(jour) + "-" + String.valueOf(mois + 1) + "-" + String.valueOf(annee);
+                        EditText et2 = (EditText)findViewById(R.id.EtDate);
+                        et2.setText(dateComplet);
+
+                    }
+                },AnneeActuelle, MoisActuel, JourActuel);
+                mDatePicker.setTitle("Choisir la date");
+                mDatePicker.show();  }
+
+        });
+
+
+
+            ContenuEditText();
+            BoutonListeners();
+            Requete();
+            EcritureFichier();
+            LectureFichier();
+            SetAutoCompleteTextView();
+
+
+        /*
+        final Spinner spinner = (Spinner)findViewById(R.id.Spinner);
+        ArrayAdapter spinnerArrayAdapter = new ArrayAdapter(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                AlistHistorique);
+        spinner.setAdapter(spinnerArrayAdapter);
+
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String lol = spinner.getSelectedItem().toString();
+                EditText EtTEst = (EditText)findViewById(R.id.ActvClasse);
+                EtTEst.setText(lol);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+*/
+
 
 
 
@@ -81,9 +165,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                ContenuEditText();
-                BoutonListeners();
-                Requete();
+
+                    ContenuEditText();
+                    BoutonListeners();
+                    Requete();
+                    EcritureFichier();
+                    LectureFichier();
+                    SetAutoCompleteTextView();
 
 
             }
@@ -137,6 +225,76 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    // Fonction pour mettre en place et mettre à jour l'autocompleteTextview
+
+    public void SetAutoCompleteTextView(){
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_dropdown_item_1line, AlistToutesClasses);
+        AutoCompleteTextView textView = (AutoCompleteTextView)
+                findViewById(R.id.ActvClasse);
+        textView.setThreshold(0);
+        textView.setAdapter(adapter);
+    }
+
+
+    // Ecriture dans le fichier.
+
+    public void EcritureFichier(){
+        AutoCompleteTextView Actv = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
+        String string = Actv.getText().toString();
+
+        File chemin = getBaseContext().getFilesDir();
+        File fichier = new File(chemin, "storage.txt");
+        Writer writer;
+        try {
+            writer = new BufferedWriter(new FileWriter(fichier, true));
+            writer.append(string + "\n");
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    // Lecture du fichier storage et mise des lignes du fichier dans un arraylist.
+
+    public void LectureFichier(){
+
+        File chemin = getBaseContext().getFilesDir();
+        File fichier = new File(chemin, "storage.txt");
+        String ligne ="";
+
+        try{
+            BufferedReader input = new BufferedReader(new FileReader(fichier));
+            while ((ligne = input.readLine()) != null) {
+                int i= 0;
+                AlistHistorique.add(i, ligne);
+                i++;
+            }
+            input.close();
+        }catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        SuppressionDoublons();
+
+    }
+
+    //Fonction pour supprimmer les doublons de lignes dans le fichier.
+    public void SuppressionDoublons(){
+
+        HashSet<String> hashSet = new HashSet<String>();
+        hashSet.addAll(AlistHistorique);
+        AlistHistorique.clear();
+        AlistHistorique.addAll(hashSet);
+
+    }
+
+
+    // Ajout de jour / semaine à la date.
+
     public void TraitementDate(String string, int i){
 
         try {
@@ -147,12 +305,42 @@ public class MainActivity extends AppCompatActivity {
             calendar.add(Calendar.DATE, i);
             ContenuDate = Formater.format(calendar.getTime());
 
-            String NomduJour = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+
 
             EditText EtDate = (EditText)findViewById(R.id.EtDate);
             EtDate.setText(ContenuDate);
+
+
+
+            // Affichage du jour de la semaine
+
+            String NomduJour = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+            switch(NomduJour){
+                case "Monday":
+                    NomduJour = "Lundi";
+                    break;
+                case "Tuesday":
+                    NomduJour = "Mardi";
+                    break;
+                case "Wednesday":
+                    NomduJour = "Mercredi";
+                    break;
+                case "Thursday":
+                    NomduJour = "Jeudi";
+                    break;
+                case "Friday":
+                    NomduJour = "Vendredi";
+                    break;
+                case "Saturday":
+                    NomduJour = "Samedi";
+                    break;
+                case "Sunday":
+                    NomduJour = "Dimanche";
+                    break;
+            }
+
             TextView TvJourDeLaSemaine = (TextView)findViewById(R.id.TvJourDeLaSemaine);
-            TvJourDeLaSemaine.setText(NomduJour);
+          //  TvJourDeLaSemaine.setText(NomduJour);
 
         } catch (ParseException e) {
             e.printStackTrace();
@@ -169,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
     }
     public boolean onOptionsItemSelected(MenuItem item){
         switch (item.getItemId()){
-            case R.id.action_vue_semaine:
+            case R.id.action_changer_vue:
                 VueSemaine();
                 return true;
             case R.id.action_effacer:
@@ -178,17 +366,40 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
+
+    // Ouverture de l'activité semaine dès que l'on clique "VueSemaine" dans le menu.
     public void VueSemaine(){
 
+        Intent intent = new Intent(this, Activite_VueSemaine.class);
+        startActivity(intent);
+
     }
+
+    // Création d'un nouveau fichier et vidage du tableau pour l'historique.
+
     public void EffacerRecherches(){
+
+        File path2 = getBaseContext().getFilesDir();
+        File file2 = new File(path2, "storage.txt");
+        try {
+            PrintWriter pw = new PrintWriter(file2);
+            pw.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+
+        AlistHistorique.clear();
+        LectureFichier();
+        SetAutoCompleteTextView();
 
     }
 
     public void ContenuEditText(){
 
-        EditText EtClasse = (EditText)findViewById(R.id.EtClasse);
-         ContenuClasse = EtClasse.getText().toString();
+       // EditText EtClasse = (EditText)findViewById(R.id.ActvClasse);
+        AutoCompleteTextView Actv =(AutoCompleteTextView)findViewById(R.id.ActvClasse);
+         ContenuClasse = Actv.getText().toString();
 
 
         SimpleDateFormat Formater = new SimpleDateFormat("dd-MM-yyyy");
@@ -213,10 +424,15 @@ DateDuJour = false;
 
 
 
+
+// 2 requête asynctask, d'abord l'id puis l'horaire avec cet id.
+
     }
     public void Requete(){
 
         try {
+               OutputListeClasse = new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=").get();
+                ParseOutputListeClasse(OutputListeClasse);
             Output= new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=" + ContenuClasse).get();
             Id =  ParseId(Output);
             Output2 =  new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=horaire&ident=" + Id + "&sub=date&date=" + ContenuDate).get();
@@ -229,10 +445,80 @@ DateDuJour = false;
 
     }
 
+    public void ParseOutputListeClasse(String outputlisteclasse){
+     /*   JSONObject reader = null;
+        String lol = "";
+        ArrayList<String> al_getAllArray=new ArrayList<String>();
+        ArrayList<String> all_classes = new ArrayList<String>();
+        int i=0;
+        try {
+            reader = new JSONObject(stringlol);
+            Iterator iteratorObj = reader.keys();
+
+            while (iteratorObj.hasNext()){
+                String getJsonObj = (String)iteratorObj.next();
+                // al_getAllArray.add(i,getJsonObj.toString()) ;
+                all_classes.add(i,reader.getString(getJsonObj));
+i++;
+
+
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+
+        TextView tv = (TextView)findViewById(R.id.TvTest);
+        tv.setText(al_getAllArray.get(0));
+*/
+
+        JSONObject reader = null;
+        String code ="";
+        //String lol2 = "";
+
+        AlistToutesClasses.clear();
+        try {
+            reader = new JSONObject(outputlisteclasse);
+            Iterator iterator = reader.keys();
+            for(int i=0;i<329;i++) {
+                code = (String) iterator.next();
+                JSONObject jsonObject = reader.getJSONObject(code);
+                AlistToutesClasses.add(i,jsonObject.getString("nom"));
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        TextView tv = (TextView)findViewById(R.id.TvTest);
+        // tv.setText(ToutesClasses.get(328));
+
+        HashSet<String> hashSet = new HashSet<String>();
+        hashSet.addAll(AlistToutesClasses);
+        AlistToutesClasses.clear();
+        AlistToutesClasses.addAll(hashSet);
+
+
+        /*
+        String lol ="";
+        try {
+            JSONObject jsonObject = new JSONObject(stringlol);
+            JSONObject jsonobject2 = jsonObject.getJSONObject("2922");
+             lol = jsonobject2.getString("nom");
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        TextView tv = (TextView)findViewById(R.id.TvTest);
+        tv.setText(lol);
+*/
+    }
+
     public void ParseOutput(String string){
 
 
-
+// Création des arrays et arrayslist pour stocker les données reçues.
 
         String[] ArrayHeureDebut = new String[100];
         String[] ArrayHeureFin = new String[100];
@@ -325,7 +611,7 @@ DateDuJour = false;
                 ArrayHeureFin[i] = ArrayHeureFin[i].substring(0, ArrayHeureFin[i].length() - 3);
 
 
-
+            // Ajout des données présents dans les array aux arraylists.
 
                 AlistHeureDebutComplet.add(i, ArrayHeureDebut[i]);
                 AlistHeureFinComplet.add(i,ArrayHeureDebut[i]);
@@ -364,6 +650,9 @@ DateDuJour = false;
             }
 
 
+
+        // Tri et basculement en fonction du bon ordre des données.
+
         JSONArray jsonArrayGeneral = null;
         try {
             jsonArrayGeneral = new JSONArray(string);
@@ -390,72 +679,88 @@ DateDuJour = false;
         }
 
 
+        //Création des layouts necessaire à l'affichage.
+
+        LinearLayout ViewPrincipale = (LinearLayout) findViewById (R.id.LlGeneral);
+        LinearLayout llHoriz = new LinearLayout(getBaseContext());
+        LinearLayout llVert1 = new LinearLayout(getBaseContext());
+        LinearLayout llVert2 = new LinearLayout(getBaseContext());
+        LinearLayout llVert3 = new LinearLayout(getBaseContext());
+        ViewPrincipale.removeAllViews();
+        iCouleurTableau = 0;
 
 
+        for(int i50 = 0; i50<jsonArrayGeneral.length();i50++) {
+
+            llHoriz = CreationHorizLayout();
+            llVert1 = CreationVerticLayout();
+            llVert2 = CreationVerticLayout();
+            llVert3 = CreationVerticLayout();
+            iCouleurTableau++;
+            TextView tv = CreationTextView(AlistHeureDebutComplet.get(i50));
+            TextView tv2 = CreationTextView(AlistHeureFinComplet.get(i50));
+            LargeurChampsHeure = false;
+            TextView tv3 = CreationTextView(AlistLibelle.get(i50));
+            TextView tv4 = CreationTextView(AlistProfesseur.get(i50));
+            TextView tv5 = CreationTextView(AlistArraySalle.get(i50));
+            TextView tv6 = CreationTextView(" ");
+            LargeurChampsHeure = true;
 
 
+            ViewPrincipale.addView(llHoriz);
+            llHoriz.addView(llVert1);
+            llHoriz.addView(llVert2);
+            llHoriz.addView(llVert3);
 
-        TextView TvResultat = (TextView) findViewById(R.id.TvResultat);
-        //    TvResultat.setText(ArrayHeureDebut[0] + " " + ArrayHeureDebut[1] + " " + ArrayHeureDebut[2] + " " + ArrayHeureDebut[3] );
-            // TvResultat.setText(ArrayHeureFin[0] + " " + ArrayHeureFin[1] + " " + ArrayHeureFin[2] + " " + ArrayHeureFin[3]);
-
-       // TvResultat.setText(AlistLibelle.get(0));
-
-
-            TextView TvTest = (TextView) findViewById(R.id.TvTest);
-            //  TvTest.setText(ArrayCalculHeureString[0] + " " + ArrayCalculHeureString[1] + " " + ArrayCalculHeureString[2] + " " + ArrayCalculHeureString[3] + " " + ArrayProfesseur[0] + " "+ ArraySalle[0]);
-
-
-            TextView TvSalle = (TextView) findViewById(R.id.TvSalle);
-            TextView TvHeureDebut = (TextView) findViewById(R.id.TvHeureDebut);
-            TextView TvHeureFin = (TextView) findViewById(R.id.TvHeureFin);
-            TextView TvLibelle = (TextView) findViewById(R.id.TvLibelle);
-            TextView TvProf = (TextView) findViewById(R.id.TvProf);
-
-            TvSalle.setText(ArraySalle[0]);
-            TvHeureDebut.setText(ArrayHeureDebutComplet[0]);
-            TvHeureFin.setText(ArrayHeureFinComplet[0]);
-            TvLibelle.setText(ArrayLibelle[0]);
-            TvProf.setText(ArrayProfesseur[0]);
-
-
-
+            llVert1.addView(tv);
+            llVert1.addView(tv2);
+            llVert2.addView(tv3);
+            llVert2.addView(tv4);
+            llVert3.addView(tv5);
+            llVert3.addView(tv6);
         }
 
-    public  TextView makeTextView (String text)
+
+
+
+    }
+
+    public  TextView CreationTextView (String text)
     {
 
         DisplayMetrics displayMetrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int height = displayMetrics.heightPixels;
-        int width = displayMetrics.widthPixels;
+        int HauteurEcran = displayMetrics.heightPixels;
+        int LargeurEcran = displayMetrics.widthPixels;
 
         TextView tv = new TextView (getBaseContext());
         tv.setText (text) ;
-        if(iCouleurHeure == 0){
-            tv.setWidth(width/5);
+     /*   if(iCouleurHeure == 0){
+            tv.setWidth(LargeurEcran/5);
         }else
         {
-            // tv.setWidth((4*width/5)/2); // Permet d'être à 20-40-40 %
-            tv.setWidth(width/2);          // Permet d'être à 20-50-30%
-
+            tv.setWidth(LargeurEcran/2);          // Permet d'être à 20-50-30%
+        } */
+        if(LargeurChampsHeure){
+            tv.setWidth(LargeurEcran/5);
         }
-        // tv.setWidth(width/3); // Permet d'être a 1/3-1/3-1/3 %
-        tv.setHeight(height/11);
+        else
+        {
+            tv.setWidth(LargeurEcran/2);
+        }
+        tv.setHeight(HauteurEcran/11);
         // tv.setHeight(200);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
         tv.setGravity(Gravity.CENTER);
-        // customise the layout of the text here, eg...
-        // tv.setPadding(0,0,0,0);
         tv.setTextColor(Color.BLACK) ;
         return tv;
     }
 
-    public  LinearLayout makeHorizLayout()
+    public  LinearLayout CreationHorizLayout()
     {
         LinearLayout ll = new LinearLayout (getBaseContext());
         ll.setOrientation(LinearLayout.HORIZONTAL);
-        ll.setWeightSum(3);
+      //  ll.setWeightSum(3);
 
 
        /* LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) ll.getLayoutParams();
@@ -476,7 +781,7 @@ DateDuJour = false;
         return ll;
     }
 
-    public LinearLayout makeVerticLayout(){
+    public LinearLayout CreationVerticLayout(){
 
 
 
@@ -509,229 +814,26 @@ DateDuJour = false;
 
 
 
-
-
-    public void CreationLayout(){
-
-
-        /*
-        LinearLayout parent = new LinearLayout(this);
-        parent.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        parent.setOrientation(LinearLayout.HORIZONTAL);
-
-        LinearLayout layout = new LinearLayout(this);
-        layout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout2 = new LinearLayout(this);
-        layout2.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout2.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout3 = new LinearLayout(this);
-        layout3.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        layout3.setOrientation(LinearLayout.VERTICAL);
-
-        parent.addView(layout);
-        parent.addView(layout2);
-        parent.addView(layout3);
-
-
-        TextView tv1 = new TextView(this);
-        TextView tv2 = new TextView(this);
-        TextView tv3 = new TextView(this);
-        TextView tv4 = new TextView(this);
-        TextView tv5 = new TextView(this);
-
-        layout.addView(tv1);
-        layout.addView(tv2);
-        layout2.addView(tv3);
-        layout2.addView(tv4);
-        layout3.addView(tv5);
-
-        tv1.setText("SIFHASIOFHDIOFSDFHIOSD");
-*/
-/*
-        LinearLayout parent = new LinearLayout(this);
-         parent = (LinearLayout)findViewById(R.id.LlGeneral);
-        parent.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        parent.setOrientation(LinearLayout.HORIZONTAL);
-
-        LinearLayout layout = (LinearLayout)findViewById(R.id.Ll1);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout2 = (LinearLayout)findViewById(R.id.Ll2);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout layout3 = (LinearLayout)findViewById(R.id.Ll3);
-        layout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.setOrientation(LinearLayout.VERTICAL);
-
-
-        LinearLayout layoutsupreme = (LinearLayout)findViewById(R.id.LlSupreme);
-        layoutsupreme.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        layoutsupreme.setOrientation(LinearLayout.VERTICAL);
-
-
-        TextView TvHeureDebut = (TextView)findViewById(R.id.TvHeureDebut);
-        TextView TvHeureFin = (TextView)findViewById(R.id.TvHeureFin);
-        TextView TvProf = (TextView)findViewById(R.id.TvProf);
-        TextView TvLibelle = (TextView)findViewById(R.id.TvLibelle);
-        TextView TvSalle = (TextView)findViewById(R.id.TvSalle);
-
-
-
-
-
-        layoutsupreme.addView(parent);
-        parent.addView(layout);
-        parent.addView(layout2);
-        parent.addView(layout3);
-
-
-
-        layout.addView(TvHeureDebut);
-        layout.addView(TvHeureFin);
-        layout2.addView(TvLibelle);
-        layout2.addView(TvProf);
-        layout3.addView(TvSalle);
-
-        TvHeureDebut.setText("CAR MARCH");
-
-
-*/
-
-/*
-        View LlSupreme = findViewById(R.id.LlSupreme);
-        //View L1General = findViewById(R.id.LlGeneral);
-        LinearLayout a = new LinearLayout(this);
-
-        TextView valueTv = new TextView(this);
-        valueTv.setText("lol");
-        valueTv.setId(0);
-        valueTv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-
-
-        ((LinearLayout) LlSupreme).addView(valueTv);
-
-      //  ((LinearLayout)L1General).removeView(LlSupreme);
-      //  ((LinearLayout)L1General).addView(L1General);
-      //  ((LinearLayout)LlSupreme).addView(a); */
-
-
-        LinearLayout LlSupreme = (LinearLayout) findViewById(R.id.LlSupreme);
-        LinearLayout LlGeneral = (LinearLayout) findViewById(R.id.LlGeneral);
-
-
-      //  ((LinearLayout) LlSupreme).addView(LlGeneral);
-
-    }
-
-
     public String ParseId(String string){
-        string = string.split(":")[0];
+       /* string = string.split(":")[0];
         string = string.substring(0, string.length() -1);
         string = string.substring(2);
-        return string;
-    }
+        return string; */
 
-/*
-    private class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
-
-        HttpURLConnection conn;
-        URL url = null;
-
-
-        @Override
-        protected String doInBackground(String... params){
-
-            try {
-                url = new URL (params[0]);
-
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-                return "exception1";
-            }
-
-            try {
-                conn = (HttpURLConnection)url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setDoInput(true);
-                conn.setDoOutput(true);
-                conn.connect();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                return "exception2";
-            }
-
-            try {
-                int response_code = conn.getResponseCode();
-
-                if (response_code == HttpURLConnection.HTTP_OK) {
-                    InputStream input = conn.getInputStream();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-                    StringBuilder result = new StringBuilder();
-                    String line;
-
-
-                    while ((line = reader.readLine()) != null) {
-                        result.append(line);
-                    }
-                    return (result.toString());
-
-
-                } else {
-                    return ("unsuccessful");
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return "exception3";
-            }
-            finally {
-                conn.disconnect();
-            }
-
+        JSONObject reader = null;
+        String code ="";
+        try {
+            reader = new JSONObject(string);
+            Iterator iterator = reader.keys();
+                code = (String) iterator.next();
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
-
-
-        @Override
-        protected void onPostExecute(String result) {
-
-
-
-            String lol="";
-            ArrayList<String> alist = new ArrayList<String>();
-
-            try {
-
-                JSONArray jsonArrayGeneral = new JSONArray(result);
-                for(int i =0;i<jsonArrayGeneral.length();i++) {
-
-                    JSONObject jsonObjectGeneral = jsonArrayGeneral.getJSONObject(i);
-                   // alist.add(i) = jsonObjectGeneral.getString("libelle");
-                    alist.add(jsonObjectGeneral.getString("libelle"));
-                }
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
-            TextView TvResultat = (TextView)findViewById(R.id.TvResultat);
-            TvResultat.setText(alist.get(0));
-
-
-        }
-
-
-
-
+        return  code;
 
 
     }
-    */
+
 
 
 }

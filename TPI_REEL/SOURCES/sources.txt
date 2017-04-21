@@ -18,3 +18,4 @@ http://stackoverflow.com/questions/11882102/adding-a-day-to-a-calendar-in-androi
 http://stackoverflow.com/questions/18256521/android-calendar-get-current-day-of-week-as-string
 http://stackoverflow.com/questions/5369682/get-current-time-and-date-on-android
 http://stackoverflow.com/questions/3204852/android-add-a-textview-to-linear-layout-programmatically
+http://stackoverflow.com/questions/24600977/parsing-a-json-object-with-an-unknown-name-with-gson
