@@ -18,22 +18,12 @@ http://stackoverflow.com/questions/11882102/adding-a-day-to-a-calendar-in-androi
 http://stackoverflow.com/questions/18256521/android-calendar-get-current-day-of-week-as-string
 http://stackoverflow.com/questions/5369682/get-current-time-and-date-on-android
 http://stackoverflow.com/questions/3204852/android-add-a-textview-to-linear-layout-programmatically
-<<<<<<< HEAD
 http://stackoverflow.com/questions/24600977/parsing-a-json-object-with-an-unknown-name-with-gson
-=======
-http://stackoverflow.com/questions/5985937/use-a-variable-in-a-url-object-in-android
-http://stackoverflow.com/questions/6421507/how-to-display-double-quotes-symbol-in-android-text-view
-http://www.javatpoint.com/android-popup-menu-example
-https://developer.android.com/training/appbar/actions.html
-https://developer.android.com/training/appbar/index.html
-http://tutos-android-france.com/menu-ajouter-des-actions-a-lactionbar/
-https://developer.android.com/reference/android/support/v7/app/AppCompatActivity.html#setSupportActionBar(android.support.v7.widget.Toolbar)
-http://stackoverflow.com/questions/14376807/how-to-read-write-string-from-a-file-in-android
-http://stackoverflow.com/questions/4614227/how-to-add-a-new-line-of-text-to-an-existing-file-in-java
-http://stackoverflow.com/questions/3554722/how-to-delete-internal-storage-file-in-android
-https://developer.android.com/training/basics/data-storage/files.html
-https://teamtreehouse.com/community/read-lines-of-a-text-file-into-an-array
-https://developer.android.com/reference/android/widget/AutoCompleteTextView.html
-http://stackoverflow.com/questions/31071283/how-to-sort-arraylist-of-string-having-integer-values-in-java
-http://stackoverflow.com/questions/36595805/how-to-sort-array-list-integer-type
->>>>>>> f69ffab86c0afa09357adc974b0c5b379fca6c7f
+http://stackoverflow.com/questions/30450015/how-to-convert-uppercase-letter-to-lowercase
+http://stackoverflow.com/questions/2115758/how-do-i-display-an-alert-dialog-on-android
+http://stackoverflow.com/questions/33929760/detect-if-android-device-is-connected-to-the-internet
+http://stackoverflow.com/questions/15718869/how-to-lock-android-apps-orientation-to-portrait-mode
+http://stackoverflow.com/questions/7966308/how-to-open-settings-of-android-phone-on-a-button-click-in-our-android-app
+http://stackoverflow.com/questions/34611977/hide-soft-keyboard-on-every-onclick-event
+http://stackoverflow.com/questions/8080579/android-textfield-set-focus-soft-input-programmatically
+http://stackoverflow.com/questions/4553374/how-to-simulate-a-button-click-using-code

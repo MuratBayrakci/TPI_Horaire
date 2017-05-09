@@ -3,21 +3,26 @@
     package="ch.cpln.bayrakcimu.tpi_horaire">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="Hypercool Reader"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        android:theme="@style/AppTheme"
+        android:configChanges="orientation|keyboardHidden|screenSize"
+        >
+        <activity android:name=".MainActivity"   android:label="@string/TitrevueJour">
+
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".Activite_VueSemaine"></activity>
+        <activity android:name=".Activite_VueSemaine" android:label="@string/TitrevueSemaine"></activity>
     </application>
 
 </manifest>

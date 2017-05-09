@@ -1,24 +1,38 @@
 package ch.cpln.bayrakcimu.tpi_horaire;
 
+import android.app.Activity;
 import android.app.DatePickerDialog;
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RectShape;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBar;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
@@ -39,7 +53,9 @@ import org.w3c.dom.Text;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -50,7 +66,9 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
 import java.sql.Array;
 import java.text.ParseException;
@@ -67,25 +85,50 @@ import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.ErrorManager;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements AsyncReponse {
+
+    String strId="";     // Variable qui va contenir l'id de la classe.
+    String strContenuClasse ="";
+    String strContenuDate="";
+    ArrayList<String> AlistLibelleToutesClasses = new ArrayList<String>();   // Arraylist de string qui va contenir le nom de toute les classes existantes.
 
 
-    String Output="";
-    String Id="";
-    String Output2="";
-    String OutputListeClasse="";
-    String ContenuClasse ="";
-    String ContenuDate="";
-    ArrayList<String> AlistToutesClasses = new ArrayList<String>();
-
-
+    // Ces deux variables vont être utilisés pour mettre correctement la couleur et la largeur des textviews lors de l'affichage.
     int iCouleurTableau = 0;
-    Boolean LargeurChampsHeure = true;
-    Boolean DateDuJour = true;
+    Boolean bLargeurChampsHeures=true;
 
 
 
-    ArrayList<String> AlistHistorique = new ArrayList<String>();
+    Boolean bPremiereOuverture = true;  // Cette variable servira à savoir si c'est la première fois que l'on ouvre l'application.
+    Boolean bEditTexteVide = false;
+    Boolean bInternetOk = true;   // True si l'utilisateur à accès à internet.
+    Boolean bAlternateur=true;
+    Boolean bAfficherContenuActv = false;
+
+
+    // La dernière classe recherchée va normalement se mettre dans le champ classe lors du onCreate. Mais si le fichier qui stocke la dernière classe
+    //n'existe pas encore, alors on va mettre le contenu de cette variable.
+    String strClasseParDefaut="3M3I2";
+
+
+    // Arraylist qui va contenir les différentes classes lorsque la requête nous renvoie plusieurs classes.
+
+    ArrayList<String> AlistPlusieursClasses = new ArrayList<String>();
+
+    int iCptNombreClasse = 0;
+    boolean bPlusieursClasseValidees = true;
+
+
+
+
+    //ArrayList<String> AlistPlusieursClasses = new ArrayList<String>();
+
+    int iChoixTraitementOutput=0;
+    String strDerniereClasseRecherchee= "";
+    ArrayList<String> AlistHistorique = new ArrayList<String>();  // Variable qui va contenir le nom des classes déjà recherchées.
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,180 +138,397 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        Button btnDatePicker = (Button)findViewById(R.id.btndatepicker);
-        btnDatePicker.setOnClickListener(new View.OnClickListener() {
+
+        // Mise en place du datepicker
+        Button btnCalendrier = (Button)findViewById(R.id.BtnCalendrier);
+        btnCalendrier.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
 
-                Calendar DateActuelle=Calendar.getInstance();
-                int AnneeActuelle = DateActuelle.get(Calendar.YEAR);
-                int MoisActuel=DateActuelle.get(Calendar.MONTH);
-                int JourActuel=DateActuelle.get(Calendar.DAY_OF_MONTH);
+                Calendar cDateActuelle=Calendar.getInstance();
+                int iAnneeActuelle = cDateActuelle.get(Calendar.YEAR);
+                int iMoisActuel=cDateActuelle.get(Calendar.MONTH);
+                int iJourActuel=cDateActuelle.get(Calendar.DAY_OF_MONTH);
 
-                final DatePickerDialog mDatePicker=new DatePickerDialog(MainActivity.this, new DatePickerDialog.OnDateSetListener() {
-                    public void onDateSet(DatePicker datepicker, int AnneeChoisie, int MoisChoisi, int JourChoisi) {
+                final DatePickerDialog datePickerDialog=new DatePickerDialog(MainActivity.this, new DatePickerDialog.OnDateSetListener() {
+                    public void onDateSet(DatePicker datepicker, int iAnneeChoisie, int iMoisChoisi, int iJourChoisi) {
 
-                        int  jour = JourChoisi;
-                        int mois = MoisChoisi;
-                        int annee = AnneeChoisie;
+                        int  ijour = iJourChoisi;
+                        int imois = iMoisChoisi;
+                        int iannee = iAnneeChoisie;
 
-                       String dateComplet = String.valueOf(jour) + "-" + String.valueOf(mois + 1) + "-" + String.valueOf(annee);
-                        EditText et2 = (EditText)findViewById(R.id.EtDate);
-                        et2.setText(dateComplet);
+                       String strDateComplete = String.valueOf(ijour) + "-" + String.valueOf(imois + 1) + "-" + String.valueOf(iannee);
+                        EditText etDate = (EditText)findViewById(R.id.EtDate);
+                        etDate.setText(strDateComplete);
 
                     }
-                },AnneeActuelle, MoisActuel, JourActuel);
-                mDatePicker.setTitle("Choisir la date");
-                mDatePicker.show();  }
+                },iAnneeActuelle, iMoisActuel, iJourActuel);
+                datePickerDialog.setTitle("Veuillez Choisir la date");
+                datePickerDialog.show();  }
 
         });
 
+        strDerniereClasseRecherchee = getDerniereClasseRecherchee();
 
 
-            ContenuEditText();
-            BoutonListeners();
-            Requete();
-            EcritureFichier();
-            LectureFichier();
-            SetAutoCompleteTextView();
+        // On va masquer le clavier lors de la première execution.
+        getWindow().setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        );
 
 
-        /*
-        final Spinner spinner = (Spinner)findViewById(R.id.Spinner);
-        ArrayAdapter spinnerArrayAdapter = new ArrayAdapter(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                AlistHistorique);
-        spinner.setAdapter(spinnerArrayAdapter);
+         //Test de la connectivité
+          bInternetOk = EstConnecte();
 
-        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String lol = spinner.getSelectedItem().toString();
-                EditText EtTEst = (EditText)findViewById(R.id.ActvClasse);
-                EtTEst.setText(lol);
+            if(bInternetOk) {
+                ContenuEditText();
+                TraitementDate(strContenuDate, 0);  // Traitement de la date avec 0 jour, pour afficher le jour de la semaine
+                Requete();
+                EcritureFichier();
+                LectureFichier();
+                MiseEnPlaceActv(AlistLibelleToutesClasses);
+
+            }else{
+                AfficheErreurInternet();
             }
 
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-
-            }
-        });
-
-*/
 
 
+        //Détection du balayage horizontal de l'écran.
 
-
-
-        Button BtnRechercher = (Button)findViewById(R.id.BtnRechercher);
-        BtnRechercher.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-
-                    ContenuEditText();
-                    BoutonListeners();
+        LinearLayout llPrincipal = (LinearLayout)findViewById(R.id.LlPricipal);
+        llPrincipal.setOnTouchListener(new SwipeListener(MainActivity.this) {
+            public void onSwipeRight() {
+                if(!bEditTexteVide) {
+                    iChoixTraitementOutput = 0;
+                    TraitementDate(strContenuDate, -1);
                     Requete();
-                    EcritureFichier();
-                    LectureFichier();
-                    SetAutoCompleteTextView();
+                }
+            }
+            public void onSwipeLeft() {
+                if(!bEditTexteVide){
+                    iChoixTraitementOutput=0;
+                    TraitementDate(strContenuDate, 1);
+                    Requete();
+                }
+            }
+        });
 
+
+
+        // Si l'utilisateur vient de cliquer sur le bouton pour afficher lhistorique, alors on va afficher le contenu de l'actv.
+
+        final AutoCompleteTextView actvClasse = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
+        actvClasse.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(bAfficherContenuActv){
+
+                actvClasse.showDropDown();
+
+                }
+                bAfficherContenuActv=false;
+
+                if(bPlusieursClasseValidees) {
+                    CacherClavier(getBaseContext(), actvClasse);
+                    bAfficherContenuActv=true;  // Ici on remet a true sinon quand on clique, on ne peut plus taper dans le champs.
+
+                }
 
             }
         });
 
 
 
+
+        Button btnPlusJour = (Button)findViewById(R.id.BtnPlusJour);
+        btnPlusJour.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!bPlusieursClasseValidees){
+                if(!bEditTexteVide){
+                    bPlusieursClasseValidees=true;
+                    iChoixTraitementOutput=0;
+                    TraitementDate(strContenuDate, 1);
+                    Requete();
+                }}
+            }
+        });
+
+        Button btnPlusSemaine = (Button)findViewById(R.id.BtnPlusSemaine);
+        btnPlusSemaine.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!bEditTexteVide) {
+                    if(!bPlusieursClasseValidees){
+                    bPlusieursClasseValidees=true;
+                    iChoixTraitementOutput = 0;
+                    TraitementDate(strContenuDate, 7);
+                    Requete();
+                } }
+            }
+        });
+
+        Button btnMoinsJour = (Button)findViewById(R.id.BtnMoinsJour);
+        btnMoinsJour.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!bPlusieursClasseValidees){
+                if(!bEditTexteVide) {
+                    bPlusieursClasseValidees=true;
+                    iChoixTraitementOutput = 0;
+                    TraitementDate(strContenuDate, -1);
+                    Requete();
+                } }
+            }
+        });
+
+        Button btnMoinsSemaine = (Button)findViewById(R.id.BtnMoinsSemaine);
+        btnMoinsSemaine.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                if(!bPlusieursClasseValidees){
+                if(!bEditTexteVide) {
+                    bPlusieursClasseValidees=true;
+                    iChoixTraitementOutput = 0;
+                    TraitementDate(strContenuDate, -7);
+                    Requete();
+                }
+                }
+            }
+        });
+
+
+
+
+
+        Button btnRechercher = (Button)findViewById(R.id.BtnRechercher);
+        btnRechercher.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                bInternetOk = EstConnecte();
+
+                if(bInternetOk) {
+                    bEditTexteVide = false;
+                    iChoixTraitementOutput = 0;
+                    ContenuEditText();
+                    if (!bEditTexteVide) {
+                        TraitementDate(strContenuDate, 0);
+                        Requete();
+                    }
+                }else{
+                    AfficheErreurInternet();
+                }
+            }
+        });
+
+
+
+
+
+        final Button btnAlternateur = (Button)findViewById(R.id.BtnAlternateur);
+        btnAlternateur.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+
+                // En fonction de la variable, Changemenet du texte du bouton, et modification de la source de l'actv.
+
+                if(bAlternateur){
+                    MiseEnPlaceActv(AlistHistorique);
+                    Toast.makeText(MainActivity.this,"Affichage de l'historique", Toast.LENGTH_SHORT).show();
+                    bAfficherContenuActv = true;
+                    btnAlternateur.setText("Classes");
+
+
+                }else{
+                    MiseEnPlaceActv(AlistLibelleToutesClasses);
+                    Toast.makeText(MainActivity.this,"Affichage de toutes les classes", Toast.LENGTH_SHORT).show();
+                    btnAlternateur.setText("Historique");
+                }
+                bAlternateur = !bAlternateur;
+            }
+        });
+
+    }
+
+    public static void CacherClavier(Context context, View view) {
+        InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        inputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager.HIDE_IMPLICIT_ONLY);
+        inputMethodManager.hideSoftInputFromWindow(view.getApplicationWindowToken(), 0);
     }
 
 
 
-    public void BoutonListeners(){
+  // Si l'utilisateur ne dispose pas de connection internet, un menu s'affiche.
 
-        Button BtnPlusJour = (Button)findViewById(R.id.BtnPlusJour);
-        BtnPlusJour.setOnClickListener(new View.OnClickListener() {
+    public void AfficheErreurInternet(){
+        AlertDialog.Builder Alerte = new AlertDialog.Builder(MainActivity.this);
+        Alerte.setCancelable(false);
+        Alerte.setTitle("Pas de connection internet");
+        Alerte.setMessage("Votre appareil n'est actuellement pas connecté à internet. Veuillez vérifier votre connexion. ");
+        Alerte.setPositiveButton("Paramètres", new DialogInterface.OnClickListener() {
             @Override
-            public void onClick(View v) {
-
-                TraitementDate(ContenuDate, 1);
-                Requete();
+            public void onClick(DialogInterface dialog, int which) {
+                Intent intent = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             }
-        });
+        })
+                .setNegativeButton("Continuer", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                });
+        final AlertDialog Message = Alerte.create();
+        Message.show();
+    }
 
-        Button BtnPlusSemaine = (Button)findViewById(R.id.BtnPlusSemaine);
-        BtnPlusSemaine.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
 
-                TraitementDate(ContenuDate, 7);
-                Requete();
-            }
-        });
+    //Fonction qui va recevoir les outputs des requetes.
 
-        Button BtnMoinsJour = (Button)findViewById(R.id.BtnMoinsJour);
-        BtnMoinsJour.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                TraitementDate(ContenuDate, -1);
-                Requete();
-            }
-        });
+   public void RetourOutput(String output){
 
-        Button BtnMoinsSemaine = (Button)findViewById(R.id.BtnMoinsSemaine);
-        BtnMoinsSemaine.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                TraitementDate(ContenuDate, -7);
-                Requete();
-            }
-        });
+
+       if(iChoixTraitementOutput==0){
+           strId = TraitementId(output);
+
+
+
+           if(iCptNombreClasse>1 && !bPlusieursClasseValidees){
+               Toast.makeText(MainActivity.this,"Plusieurs classes trouvées, veuillez choisir la bonne classe", Toast.LENGTH_SHORT).show();
+               bAfficherContenuActv=true;
+               MiseEnPlaceActv(AlistPlusieursClasses);
+               bPlusieursClasseValidees=true;
+
+               AutoCompleteTextView actvClasse = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
+              actvClasse.performClick();
+
+
+
+
+           }
+           else {
+
+               bPlusieursClasseValidees = false;
+               if ("".equals(strId) || strId==null) {
+                   Toast.makeText(MainActivity.this, "Classe non trouvée", Toast.LENGTH_SHORT).show();
+                   bEditTexteVide = true;
+               } else {
+
+                   // Si id correct, alors on execute la requête suivante.
+
+                   AsyncAffichageHoraire asyncAffichageHoraire1 = new AsyncAffichageHoraire(MainActivity.this, 0);
+                   asyncAffichageHoraire1.delegate = (AsyncReponse) this;
+                   asyncAffichageHoraire1.execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=horaire&ident=" + strId + "&sub=date&date=" + strContenuDate);
+
+                   EcritureFichier();
+                   LectureFichier();
+                   if (!bAlternateur) {
+                       MiseEnPlaceActv(AlistHistorique);
+                   } else {
+                       MiseEnPlaceActv(AlistLibelleToutesClasses);
+                   }
+
+           }
+           }
+       }
+       if(iChoixTraitementOutput==1){
+
+           TraitementToutesClasses(output);
+
+       }
+       if(iChoixTraitementOutput==2){
+
+           // Si on ne recoit rien, on va afficher un message, on vide également l'affichage.
+
+           if(!"[]".equals(output)) {
+               AffichageHoraire(output);
+           }else{
+               LinearLayout llGeneral = (LinearLayout) findViewById (R.id.LlGeneral);
+               llGeneral.removeAllViews();
+               TextView tvJourDeLaSemaine = (TextView)findViewById(R.id.TvJourDeLaSemaine);
+               tvJourDeLaSemaine.append(" - Pas de cours");
+           }
+       }
+
+       iChoixTraitementOutput++;
 
     }
+
+    public boolean EstConnecte(){
+        ConnectivityManager cm = (ConnectivityManager)getBaseContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = cm.getActiveNetworkInfo();
+        boolean bInternetOk = networkInfo != null && networkInfo.isConnectedOrConnecting();
+        return  bInternetOk;
+    }
+
 
     // Fonction pour mettre en place et mettre à jour l'autocompleteTextview
 
-    public void SetAutoCompleteTextView(){
+    public void MiseEnPlaceActv(ArrayList<String> Alist){
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_dropdown_item_1line, AlistToutesClasses);
-        AutoCompleteTextView textView = (AutoCompleteTextView)
-                findViewById(R.id.ActvClasse);
-        textView.setThreshold(0);
-        textView.setAdapter(adapter);
+                android.R.layout.simple_dropdown_item_1line, Alist);
+        final AutoCompleteTextView actvClasse = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
+        actvClasse.setThreshold(0);
+        actvClasse.setAdapter(adapter);
     }
 
 
-    // Ecriture dans le fichier.
+    // Ecriture de la classe dans le fichier.
 
     public void EcritureFichier(){
-        AutoCompleteTextView Actv = (AutoCompleteTextView)findViewById(R.id.ActvClasse);
-        String string = Actv.getText().toString();
 
-        File chemin = getBaseContext().getFilesDir();
-        File fichier = new File(chemin, "storage.txt");
-        Writer writer;
+            AutoCompleteTextView actvClasse = (AutoCompleteTextView) findViewById(R.id.ActvClasse);
+            String strChampsClasse = actvClasse.getText().toString();
+        strChampsClasse = strChampsClasse.toUpperCase();
+
+            File chemin = getBaseContext().getFilesDir();
+            File fichier = new File(chemin, "storage.txt");
+            Writer writer;
+            try {
+                writer = new BufferedWriter(new FileWriter(fichier, true));
+                writer.append(strChampsClasse + "\n");
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+        // Ecriture dans le fichier dernière classe
+
+        File fichierDerniereClasse = new File(chemin, "DerniereClasse.txt");
         try {
-            writer = new BufferedWriter(new FileWriter(fichier, true));
-            writer.append(string + "\n");
-            writer.close();
-        } catch (IOException e) {
+            PrintWriter pw = new PrintWriter(fichierDerniereClasse);
+            pw.close();
+        } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+        Writer writer2;
+        try{
+            writer2 = new BufferedWriter(new FileWriter(fichierDerniereClasse, true));
+            writer2.append(strChampsClasse);
+            writer2.close();
+        }catch(IOException e){
+        }
 
-    }
+        }
 
-    // Lecture du fichier storage et mise des lignes du fichier dans un arraylist.
+
+
+    // Lecture du fichier et ajout des lignes dans l'arraylist
 
     public void LectureFichier(){
-
         File chemin = getBaseContext().getFilesDir();
         File fichier = new File(chemin, "storage.txt");
-        String ligne ="";
+        String strligne ="";
 
         try{
             BufferedReader input = new BufferedReader(new FileReader(fichier));
-            while ((ligne = input.readLine()) != null) {
+            while ((strligne = input.readLine()) != null) {
                 int i= 0;
-                AlistHistorique.add(i, ligne);
+                AlistHistorique.add(i, strligne);
                 i++;
             }
             input.close();
@@ -277,10 +537,32 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         SuppressionDoublons();
 
     }
+
+
+    //Fonction pour récupérer la dernière classe recherchée
+    public String getDerniereClasseRecherchee(){
+
+        File chemin = getBaseContext().getFilesDir();
+        String strligne ="";
+        File fichierDerniereClasse = new File(chemin, "DerniereClasse.txt");
+
+        try{
+            BufferedReader input = new BufferedReader(new FileReader(fichierDerniereClasse));
+            while ((strligne = input.readLine()) != null) {
+                strDerniereClasseRecherchee = strligne;
+            }
+            input.close();
+        }catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return  strDerniereClasseRecherchee;
+    }
+
 
     //Fonction pour supprimmer les doublons de lignes dans le fichier.
     public void SuppressionDoublons(){
@@ -299,62 +581,62 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             SimpleDateFormat Formater = new SimpleDateFormat("dd-MM-yyyy");
-            Date dateObj = Formater.parse(string);
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(dateObj);
-            calendar.add(Calendar.DATE, i);
-            ContenuDate = Formater.format(calendar.getTime());
+            Date ObjetDate = Formater.parse(string);
+            Calendar calendrier = Calendar.getInstance();
+            calendrier.setTime(ObjetDate);
+            calendrier.add(Calendar.DATE, i);
+            strContenuDate = Formater.format(calendrier.getTime());
 
 
 
             EditText EtDate = (EditText)findViewById(R.id.EtDate);
-            EtDate.setText(ContenuDate);
+            EtDate.setText(strContenuDate);
 
 
 
             // Affichage du jour de la semaine
 
-            String NomduJour = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
-            switch(NomduJour){
+            String strNomduJour = calendrier.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+            switch(strNomduJour){
                 case "Monday":
-                    NomduJour = "Lundi";
+                    strNomduJour = "Lundi";
                     break;
                 case "Tuesday":
-                    NomduJour = "Mardi";
+                    strNomduJour = "Mardi";
                     break;
                 case "Wednesday":
-                    NomduJour = "Mercredi";
+                    strNomduJour = "Mercredi";
                     break;
                 case "Thursday":
-                    NomduJour = "Jeudi";
+                    strNomduJour = "Jeudi";
                     break;
                 case "Friday":
-                    NomduJour = "Vendredi";
+                    strNomduJour = "Vendredi";
                     break;
                 case "Saturday":
-                    NomduJour = "Samedi";
+                    strNomduJour = "Samedi";
                     break;
                 case "Sunday":
-                    NomduJour = "Dimanche";
+                    strNomduJour = "Dimanche";
                     break;
             }
-
-            TextView TvJourDeLaSemaine = (TextView)findViewById(R.id.TvJourDeLaSemaine);
-          //  TvJourDeLaSemaine.setText(NomduJour);
-
+            TextView tvJourDeLaSemaine = (TextView)findViewById(R.id.TvJourDeLaSemaine);
+            tvJourDeLaSemaine.setText(strNomduJour);
         } catch (ParseException e) {
             e.printStackTrace();
         }
-
     }
 
 
-
+    // Fonction pour créer le menu
 
     public boolean onCreateOptionsMenu(Menu menu){
         getMenuInflater().inflate(R.menu.menu, menu);
         return true;
     }
+
+    // Lorseque l'on clique sur un bouton du menu, on lance la fonction correspondente.
+
     public boolean onOptionsItemSelected(MenuItem item){
         switch (item.getItemId()){
             case R.id.action_changer_vue:
@@ -367,155 +649,144 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    // Ouverture de l'activité semaine dès que l'on clique "VueSemaine" dans le menu.
+
     public void VueSemaine(){
 
-        Intent intent = new Intent(this, Activite_VueSemaine.class);
-        startActivity(intent);
+        if(bInternetOk) {
 
+            Intent intent = new Intent(this, Activite_VueSemaine.class);
+            startActivity(intent);
+        }else
+        {
+            AfficheErreurInternet();
+        }
     }
 
-    // Création d'un nouveau fichier et vidage du tableau pour l'historique.
+    // Création d'un nouveau fichier historique, et vidage de l'arraylist.
 
     public void EffacerRecherches(){
 
-        File path2 = getBaseContext().getFilesDir();
-        File file2 = new File(path2, "storage.txt");
+        File chemin = getBaseContext().getFilesDir();
+        File fichier = new File(chemin, "storage.txt");
         try {
-            PrintWriter pw = new PrintWriter(file2);
+            PrintWriter pw = new PrintWriter(fichier);
             pw.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
 
-
         AlistHistorique.clear();
         LectureFichier();
-        SetAutoCompleteTextView();
+        MiseEnPlaceActv(AlistLibelleToutesClasses);
+        bAlternateur=true;
+
+        Button btnAlternateur = (Button)findViewById(R.id.BtnAlternateur);
+        String strTexteAlternateur = btnAlternateur.getText().toString();
+        if("Classes".equals(strTexteAlternateur)){btnAlternateur.setText("Historique");}
+
 
     }
 
+
+    // Cette fonction va mettre le contenu des champs dans des variables.
+
     public void ContenuEditText(){
 
-       // EditText EtClasse = (EditText)findViewById(R.id.ActvClasse);
-        AutoCompleteTextView Actv =(AutoCompleteTextView)findViewById(R.id.ActvClasse);
-         ContenuClasse = Actv.getText().toString();
+        AutoCompleteTextView actvClasse =(AutoCompleteTextView)findViewById(R.id.ActvClasse);
+
+        if(bPremiereOuverture){
+            if("".equals(strDerniereClasseRecherchee)){
+                actvClasse.setText(strClasseParDefaut);
+            }else{
+                actvClasse.setText(strDerniereClasseRecherchee);
+            }
+        }
+
+         strContenuClasse = actvClasse.getText().toString();
+
+
+
+        if("".equals(strContenuClasse))
+        {bEditTexteVide=true;
+            Toast.makeText(MainActivity.this,"Veuillez entrer une classe", Toast.LENGTH_SHORT).show();
+        }else{
+            // On remplace les espaces par %20 sinon la classe n'était pas valide.
+        strContenuClasse = strContenuClasse.replace(" ","%20");
+        }
+
+
+
 
 
         SimpleDateFormat Formater = new SimpleDateFormat("dd-MM-yyyy");
         Calendar calendar = Calendar.getInstance();
-        String JourActuel = Formater.format(calendar.getTime());
+        String strJourActuel = Formater.format(calendar.getTime());
 
 
-        EditText EtDate = (EditText)findViewById(R.id.EtDate);
-         ContenuDate = EtDate.getText().toString();
+        EditText etDate = (EditText)findViewById(R.id.EtDate);
+         strContenuDate = etDate.getText().toString();
 
-        if(DateDuJour == true) {
-            ContenuDate = JourActuel;
+        if(bPremiereOuverture) {
+            strContenuDate = strJourActuel;
         }
-        EtDate.setText(ContenuDate);
+
+        if("".equals(strContenuDate)){
+            bEditTexteVide=true;
+            Toast.makeText(MainActivity.this,"Veuillez entrer une date", Toast.LENGTH_SHORT).show();
+        }else{
+            etDate.setText(strContenuDate);
+        }
+
+bPremiereOuverture = false;
 
 
-DateDuJour = false;
-
-
-
-
-
-
-
-
-// 2 requête asynctask, d'abord l'id puis l'horaire avec cet id.
+// Lancement de 2 requêtes, d'abord celle pour avoir l'id de la classe, puis celle pour remplir l'arraylist contenant les noms des classes.
 
     }
     public void Requete(){
 
-        try {
-               OutputListeClasse = new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=").get();
-                ParseOutputListeClasse(OutputListeClasse);
-            Output= new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=" + ContenuClasse).get();
-            Id =  ParseId(Output);
-            Output2 =  new AsyncAffichageHoraire().execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=horaire&ident=" + Id + "&sub=date&date=" + ContenuDate).get();
-            ParseOutput(Output2);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        }
+        AsyncAffichageHoraire asyncAffichageHoraire0 = new AsyncAffichageHoraire(MainActivity.this, 1);
+        asyncAffichageHoraire0.delegate = (AsyncReponse) this;
+        asyncAffichageHoraire0.execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=" + strContenuClasse);
+
+        AsyncAffichageHoraire asyncAffichageHoraire2 = new AsyncAffichageHoraire(MainActivity.this, 1);
+        asyncAffichageHoraire2.delegate = (AsyncReponse) this;
+        asyncAffichageHoraire2.execute("http://devinter.cpln.ch/pdf/hypercool/controler.php?action=ressource&nom=");
+
 
     }
 
-    public void ParseOutputListeClasse(String outputlisteclasse){
-     /*   JSONObject reader = null;
-        String lol = "";
-        ArrayList<String> al_getAllArray=new ArrayList<String>();
-        ArrayList<String> all_classes = new ArrayList<String>();
-        int i=0;
-        try {
-            reader = new JSONObject(stringlol);
-            Iterator iteratorObj = reader.keys();
-
-            while (iteratorObj.hasNext()){
-                String getJsonObj = (String)iteratorObj.next();
-                // al_getAllArray.add(i,getJsonObj.toString()) ;
-                all_classes.add(i,reader.getString(getJsonObj));
-i++;
-
-
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-
-        TextView tv = (TextView)findViewById(R.id.TvTest);
-        tv.setText(al_getAllArray.get(0));
-*/
+    public void TraitementToutesClasses(String outputlisteclasse){
 
         JSONObject reader = null;
-        String code ="";
-        //String lol2 = "";
+        String strCode ="";
 
-        AlistToutesClasses.clear();
+        AlistLibelleToutesClasses.clear();
+
         try {
             reader = new JSONObject(outputlisteclasse);
             Iterator iterator = reader.keys();
-            for(int i=0;i<329;i++) {
-                code = (String) iterator.next();
-                JSONObject jsonObject = reader.getJSONObject(code);
-                AlistToutesClasses.add(i,jsonObject.getString("nom"));
+            for(int iCpt=0;iCpt<329;iCpt++) {
+                strCode = (String) iterator.next();
+                JSONObject jsonObject = reader.getJSONObject(strCode);
+                AlistLibelleToutesClasses.add(iCpt,jsonObject.getString("nom"));
             }
-
         } catch (JSONException e) {
             e.printStackTrace();
+
+            // Si cette requete ne répond pas, ca signifie que hypercool n'est pas disponible.
+            Toast.makeText(MainActivity.this,"Hypercool hors-ligne, impossible de récupérer les données.", Toast.LENGTH_SHORT).show();
         }
 
-        TextView tv = (TextView)findViewById(R.id.TvTest);
-        // tv.setText(ToutesClasses.get(328));
 
         HashSet<String> hashSet = new HashSet<String>();
-        hashSet.addAll(AlistToutesClasses);
-        AlistToutesClasses.clear();
-        AlistToutesClasses.addAll(hashSet);
+        hashSet.addAll(AlistLibelleToutesClasses);
+        AlistLibelleToutesClasses.clear();
+        AlistLibelleToutesClasses.addAll(hashSet);
 
-
-        /*
-        String lol ="";
-        try {
-            JSONObject jsonObject = new JSONObject(stringlol);
-            JSONObject jsonobject2 = jsonObject.getJSONObject("2922");
-             lol = jsonobject2.getString("nom");
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        TextView tv = (TextView)findViewById(R.id.TvTest);
-        tv.setText(lol);
-*/
     }
 
-    public void ParseOutput(String string){
+    public void AffichageHoraire(String string){
 
 
 // Création des arrays et arrayslist pour stocker les données reçues.
@@ -531,20 +802,13 @@ i++;
         String[] ArrayCalculHeureString = new String[100];
 
 
-    //    ArrayList<Integer> aListDebut = new ArrayList<Integer>();
-   //     ArrayList<Integer> aListFin = new ArrayList<Integer>();
-        ArrayList<Integer> aListCalcul = new ArrayList<Integer>();
-
-     //   ArrayList<String> AlistArrayHeureDebut = new ArrayList<String>();
-    //    ArrayList<String> AlistArrayHeureFin = new ArrayList<String>();
+        ArrayList<Integer> AListCalcul = new ArrayList<Integer>();
         ArrayList<String> AlistHeureDebutComplet = new ArrayList<String>();
         ArrayList<String> AlistHeureFinComplet = new ArrayList<String>();
         ArrayList<String> AlistLibelle = new ArrayList<String>();
         ArrayList<String> AlistProfesseur = new ArrayList<String>();
         ArrayList<String> AlistArraySalle = new ArrayList<String>();
         ArrayList<Integer> AlistCalculHeure = new ArrayList<Integer>();
-
-
 
 
         int i = 0;
@@ -561,31 +825,21 @@ i++;
                 ArrayHeureFin[i] = jsonObjectGeneral.getString("heureFin");
                 ArrayLibelle[i] = jsonObjectGeneral.getString("libelle");
 
-
-
-
                 try {
                     JSONArray jsonArrayProf = jsonObjectGeneral.getJSONArray("professeur");
                     ArrayProfesseur[i] = jsonArrayProf.getString(0);
 
-
                 }catch (JSONException e){
                     ArrayProfesseur[i] = "/";
-
                 }
-
 
                 try {
                     JSONArray jsonArraySalle = jsonObjectGeneral.getJSONArray("salle");
                     // ArraySalle[i] = jsonArraySalle.getString(jsonArraySalle.length()-1);
                     ArraySalle[i] = jsonArraySalle.getString(0);
 
-
                 }catch(JSONException e) {
                     ArraySalle[i] = "/-";
-
-
-
                 }
 
                 try {
@@ -596,14 +850,10 @@ i++;
                 try {
                     ArraySalle[i] = ArraySalle[i].substring(0, ArraySalle[i].indexOf("-"));
 
-
                 }
                 catch(Exception e){
 
                 }
-
-
-
 
                 ArrayHeureDebutComplet[i] = ArrayHeureDebut[i];
                 ArrayHeureFinComplet[i] = ArrayHeureFin[i];
@@ -611,7 +861,7 @@ i++;
                 ArrayHeureFin[i] = ArrayHeureFin[i].substring(0, ArrayHeureFin[i].length() - 3);
 
 
-            // Ajout des données présents dans les array aux arraylists.
+            // Ajout des données présentes dans les array aux arraylists.
 
                 AlistHeureDebutComplet.add(i, ArrayHeureDebut[i]);
                 AlistHeureFinComplet.add(i,ArrayHeureDebut[i]);
@@ -629,211 +879,201 @@ i++;
 
 
                     AlistCalculHeure.add(i, ArrayCalculHeure[i]);
-                    aListCalcul.add(i, iHeureDebut + iHeureFin);
+                    AListCalcul.add(i, iHeureDebut + iHeureFin);
 
 
                 } catch (NumberFormatException nfe) {
                 }
 
 
-
-
             }
-
-          //  Collections.sort(aListCalcul);
-
-
-
 
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-
-
 
         // Tri et basculement en fonction du bon ordre des données.
 
         JSONArray jsonArrayGeneral = null;
         try {
             jsonArrayGeneral = new JSONArray(string);
-            Collections.sort(aListCalcul);
+            Collections.sort(AListCalcul);    // Tri du calcul càd HeureDebut + HeureFin.
 
-            for(int i20=0;i20<jsonArrayGeneral.length();i20++) {
+            for(int iBranche=0;iBranche<jsonArrayGeneral.length();iBranche++) {
 
                 for (int i10 = 0; i10 < jsonArrayGeneral.length(); i10++) {
-                    if (AlistCalculHeure.get(i10).equals(aListCalcul.get(i20))) {
-                        AlistLibelle.add(i20, ArrayLibelle[i10]);
-                        AlistHeureDebutComplet.add(i20, ArrayHeureDebutComplet[i10]);
-                        AlistHeureFinComplet.add(i20, ArrayHeureFinComplet[i10]);
-                        AlistProfesseur.add(i20, ArrayProfesseur[i10]);
-                        AlistArraySalle.add(i20, ArraySalle[i10]);
+                    if (AlistCalculHeure.get(i10).equals(AListCalcul.get(iBranche))) {
+                        AlistLibelle.add(iBranche, ArrayLibelle[i10]);
+                        AlistHeureDebutComplet.add(iBranche, ArrayHeureDebutComplet[i10]);
+                        AlistHeureFinComplet.add(iBranche, ArrayHeureFinComplet[i10]);
+                        AlistProfesseur.add(iBranche, ArrayProfesseur[i10]);
+                        AlistArraySalle.add(iBranche, ArraySalle[i10]);
                     }
                 }
             }
 
-
-
-            //   }
         } catch (JSONException e) {
             e.printStackTrace();
         }
 
+        //Création des layouts necessaires à l'affichage.
 
-        //Création des layouts necessaire à l'affichage.
-
-        LinearLayout ViewPrincipale = (LinearLayout) findViewById (R.id.LlGeneral);
+        LinearLayout llGeneral = (LinearLayout) findViewById (R.id.LlGeneral);
         LinearLayout llHoriz = new LinearLayout(getBaseContext());
         LinearLayout llVert1 = new LinearLayout(getBaseContext());
         LinearLayout llVert2 = new LinearLayout(getBaseContext());
         LinearLayout llVert3 = new LinearLayout(getBaseContext());
-        ViewPrincipale.removeAllViews();
         iCouleurTableau = 0;
 
 
-        for(int i50 = 0; i50<jsonArrayGeneral.length();i50++) {
+        if("{\"error\":\"la date n'est pas valide\"}".equals(string)){
+            Toast.makeText(MainActivity.this,"Veuillez entrer une date valide", Toast.LENGTH_SHORT).show();
+            bEditTexteVide=true;
+        }else
+        {
 
-            llHoriz = CreationHorizLayout();
-            llVert1 = CreationVerticLayout();
-            llVert2 = CreationVerticLayout();
-            llVert3 = CreationVerticLayout();
-            iCouleurTableau++;
-            TextView tv = CreationTextView(AlistHeureDebutComplet.get(i50));
-            TextView tv2 = CreationTextView(AlistHeureFinComplet.get(i50));
-            LargeurChampsHeure = false;
-            TextView tv3 = CreationTextView(AlistLibelle.get(i50));
-            TextView tv4 = CreationTextView(AlistProfesseur.get(i50));
-            TextView tv5 = CreationTextView(AlistArraySalle.get(i50));
-            TextView tv6 = CreationTextView(" ");
-            LargeurChampsHeure = true;
+            // Creation de l'affichage.
+
+            llGeneral.removeAllViews();
+            for (int iBranche = 0; iBranche < jsonArrayGeneral.length(); iBranche++) {
+
+                llHoriz = CreationLayoutHoriz();
+                llVert1 = CreationLayoutVertic();
+                llVert2 = CreationLayoutVertic();
+                llVert3 = CreationLayoutVertic();
+                iCouleurTableau++;
+                TextView tv1 = CreationTextView(AlistHeureDebutComplet.get(iBranche));
+                TextView tv2 = CreationTextView(AlistHeureFinComplet.get(iBranche));
+                bLargeurChampsHeures = false;
+                TextView tv3 = CreationTextView(AlistLibelle.get(iBranche));
+                TextView tv4 = CreationTextView(AlistProfesseur.get(iBranche));
+                TextView tv5 = CreationTextView(AlistArraySalle.get(iBranche));
+                TextView tv6 = CreationTextView(" ");
+                bLargeurChampsHeures = true;
 
 
-            ViewPrincipale.addView(llHoriz);
-            llHoriz.addView(llVert1);
-            llHoriz.addView(llVert2);
-            llHoriz.addView(llVert3);
+                llGeneral.addView(llHoriz);
+                llHoriz.addView(llVert1);
+                llHoriz.addView(llVert2);
+                llHoriz.addView(llVert3);
 
-            llVert1.addView(tv);
-            llVert1.addView(tv2);
-            llVert2.addView(tv3);
-            llVert2.addView(tv4);
-            llVert3.addView(tv5);
-            llVert3.addView(tv6);
+                llVert1.addView(tv1);
+                llVert1.addView(tv2);
+                llVert2.addView(tv3);
+                llVert2.addView(tv4);
+                llVert3.addView(tv5);
+                llVert3.addView(tv6);
+            }
+
         }
 
-
-
-
     }
+
+    // Création du TextView avec tous ces paramètres.
 
     public  TextView CreationTextView (String text)
     {
 
         DisplayMetrics displayMetrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int HauteurEcran = displayMetrics.heightPixels;
-        int LargeurEcran = displayMetrics.widthPixels;
+        int iHauteurEcran = displayMetrics.heightPixels;
+        int iLargeurEcran = displayMetrics.widthPixels;
 
         TextView tv = new TextView (getBaseContext());
         tv.setText (text) ;
-     /*   if(iCouleurHeure == 0){
-            tv.setWidth(LargeurEcran/5);
-        }else
-        {
-            tv.setWidth(LargeurEcran/2);          // Permet d'être à 20-50-30%
-        } */
-        if(LargeurChampsHeure){
-            tv.setWidth(LargeurEcran/5);
+        if(bLargeurChampsHeures){
+            tv.setWidth(iLargeurEcran/5);
         }
         else
         {
-            tv.setWidth(LargeurEcran/2);
+            tv.setWidth(iLargeurEcran/2);
         }
-        tv.setHeight(HauteurEcran/11);
-        // tv.setHeight(200);
+        tv.setHeight(iHauteurEcran/11);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP,20);
         tv.setGravity(Gravity.CENTER);
         tv.setTextColor(Color.BLACK) ;
         return tv;
     }
 
-    public  LinearLayout CreationHorizLayout()
+
+    public  LinearLayout CreationLayoutHoriz()
     {
         LinearLayout ll = new LinearLayout (getBaseContext());
         ll.setOrientation(LinearLayout.HORIZONTAL);
-      //  ll.setWeightSum(3);
-
-
-       /* LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) ll.getLayoutParams();
-        params.height = 500;
-        params.width = 500;
-        ll.setLayoutParams(params); */
-
         ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-
         ShapeDrawable sd = new ShapeDrawable();
         sd.setShape(new RectShape());
-        //sd.getPaint().setColor(Color.BLUE);
         sd.getPaint().setStrokeWidth(5);
         sd.getPaint().setStyle(Paint.Style.STROKE);
         ll.setBackground(sd);
-
         return ll;
     }
 
-    public LinearLayout CreationVerticLayout(){
-
-
-
+    public LinearLayout CreationLayoutVertic(){
 
         LinearLayout ll = new LinearLayout(getBaseContext());
         ll.setOrientation(LinearLayout.VERTICAL);
-
         ll.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
         ShapeDrawable sd = new ShapeDrawable();
-        // sd.setPadding(100,100,100,100);
-
-        // sd.setShape(new RectShape());
         if ((iCouleurTableau % 2) == 1){
             sd.getPaint().setColor(Color.argb(235,235,235,235));
-
         }
         else{
             sd.getPaint().setColor(Color.argb(201,201,201,201));
-
         }
-
-
-        // sd.getPaint().setStrokeWidth(5);
-        // sd.getPaint().setStyle(Paint.Style.STROKE);
         ll.setBackground(sd);
-
         return ll;
     }
 
 
-
-    public String ParseId(String string){
-       /* string = string.split(":")[0];
-        string = string.substring(0, string.length() -1);
-        string = string.substring(2);
-        return string; */
-
+    public String TraitementId(String string) {
+/*
         JSONObject reader = null;
-        String code ="";
+        String strCode ="";
         try {
             reader = new JSONObject(string);
             Iterator iterator = reader.keys();
-                code = (String) iterator.next();
+            strCode = (String) iterator.next();
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        return  code;
+        return  strCode;
+*/
+
+        AlistPlusieursClasses.clear();
+        iCptNombreClasse = 0;
+        JSONObject reader = null;
+      //  String code ="";
+        String[] arrayCode = new String[1000];
+        try {
+            reader = new JSONObject(string);
+            Iterator iteratorObj = reader.keys();
+            while (iteratorObj.hasNext()) {
+
+                arrayCode[iCptNombreClasse] = (String) iteratorObj.next();
+                JSONObject jsonObject = reader.getJSONObject(arrayCode[iCptNombreClasse]);
+                AlistPlusieursClasses.add(iCptNombreClasse, jsonObject.getString("nom"));
+
+             //   code = (String) iteratorObj.next();
+             //   JSONObject jsonObject = reader.getJSONObject(code);
+             //   AlistPlusieursClasses.add(iCptNombreClasse,jsonObject.getString("nom"));
+                iCptNombreClasse++;
+            }
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        TextView tv = (TextView)findViewById(R.id.TvTest);
+        tv.setText(arrayCode[0]);
+
+         //   return code;
+        return arrayCode[0];
+
+
 
 
     }
-
 
 
 }

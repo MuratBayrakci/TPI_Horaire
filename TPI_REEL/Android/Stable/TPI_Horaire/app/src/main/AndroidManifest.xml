@@ -14,8 +14,6 @@
         android:configChanges="orientation|keyboardHidden|screenSize"
         >
         <activity android:name=".MainActivity"   android:label="@string/TitrevueJour">
-
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

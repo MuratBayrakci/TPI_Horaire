@@ -70,9 +70,9 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
         }
 
         try {
-            int code_reponse = conn.getResponseCode();
+            int iCode_reponse = conn.getResponseCode();
 
-            if (code_reponse == HttpURLConnection.HTTP_OK) {
+            if (iCode_reponse == HttpURLConnection.HTTP_OK) {
                 InputStream input = conn.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(input));
                 StringBuilder result = new StringBuilder();

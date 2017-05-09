@@ -1,6 +1,10 @@
 package ch.cpln.bayrakcimu.tpi_horaire;
 
+import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.os.AsyncTask;
+import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -17,12 +21,36 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
     HttpURLConnection conn;
     URL url = null;
 
+    public AsyncReponse delegate = null;
+    ProgressDialog dialog;
+
+
+    Activity activite;
+    public int iNum;
+    public AsyncAffichageHoraire(Activity a, int iNumrecu)
+    {
+        this.activite = a;
+        dialog = new ProgressDialog(activite);
+        iNum = iNumrecu;
+    }
+
+    public void onPreExecute() {
+        if(iNum==0){
+            this.dialog.setMessage("Réception des données...");
+            this.dialog.setCancelable(false);
+            this.dialog.show();
+        }
+    }
+
+
+
 
     @Override
-    protected String doInBackground(String... params){
+    protected String doInBackground(String... params) {
+
 
         try {
-            url = new URL (params[0]);
+            url = new URL(params[0]);
 
         } catch (MalformedURLException e) {
             e.printStackTrace();
@@ -30,7 +58,7 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
         }
 
         try {
-            conn = (HttpURLConnection)url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoInput(true);
             conn.setDoOutput(true);
@@ -42,17 +70,17 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
         }
 
         try {
-            int response_code = conn.getResponseCode();
+            int code_reponse = conn.getResponseCode();
 
-            if (response_code == HttpURLConnection.HTTP_OK) {
+            if (code_reponse == HttpURLConnection.HTTP_OK) {
                 InputStream input = conn.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(input));
                 StringBuilder result = new StringBuilder();
-                String line;
+                String strLigne;
 
 
-                while ((line = reader.readLine()) != null) {
-                    result.append(line);
+                while ((strLigne = reader.readLine()) != null) {
+                    result.append(strLigne);
                 }
                 return (result.toString());
 
@@ -63,8 +91,7 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
         } catch (IOException e) {
             e.printStackTrace();
             return "exception3";
-        }
-        finally {
+        } finally {
             conn.disconnect();
         }
 
@@ -74,29 +101,9 @@ public class AsyncAffichageHoraire extends AsyncTask<String, String, String> {
     @Override
     protected void onPostExecute(String result) {
 
+            dialog.dismiss();
+            delegate.RetourOutput(result);
 
-            /*
-            String lol="";
-            ArrayList<String> alist = new ArrayList<String>();
-
-            try {
-
-                JSONArray jsonArrayGeneral = new JSONArray(result);
-                for(int i =0;i<jsonArrayGeneral.length();i++) {
-
-                    JSONObject jsonObjectGeneral = jsonArrayGeneral.getJSONObject(i);
-                   // alist.add(i) = jsonObjectGeneral.getString("libelle");
-                    alist.add(jsonObjectGeneral.getString("libelle"));
-                }
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
-            TextView TvResultat = (TextView)findViewById(R.id.TvResultat);
-            TvResultat.setText(alist.get(0));
-
-*/
     }
 
 }

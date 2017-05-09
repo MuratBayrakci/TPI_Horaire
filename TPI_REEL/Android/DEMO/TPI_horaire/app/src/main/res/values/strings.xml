@@ -1,7 +1,0 @@
-<resources>
-    <string name="app_name">TPI_horaire</string>
-    <string name="datePlus">--></string>
-    <string name="datePlusPlus">-->></string>
-    <string name="dateMoins"> --</string>
-    <string name="dateMoinsMoins"> ----</string>
-</resources>

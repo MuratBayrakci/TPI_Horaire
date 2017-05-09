@@ -4,7 +4,7 @@
 
     <item
         android:id="@+id/action_changer_vue"
-        android:title="Changer de vue"
+        android:title="Vue semaine"
         app:showAsAction="never" />
 
     <item
