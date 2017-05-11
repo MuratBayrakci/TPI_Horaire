@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/TPI_horaire.iml" filepath="$PROJECT_DIR$/TPI_horaire.iml" />
+      <module fileurl="file://$PROJECT_DIR$/TPI_Horaire.iml" filepath="$PROJECT_DIR$/TPI_Horaire.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
